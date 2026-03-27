@@ -1,16 +1,22 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-import pickle
+import joblib
 
-def load_data(path):
-    return pd.read_csv(path)
+def load_and_preprocess(data_path="data/Mall_Customers.csv"):
+    """
+    Load dataset and apply feature scaling
+    """
 
-def preprocess_data(df):
+    df = pd.read_csv(data_path)
+
+    # Select important features
     X = df[['Annual Income (k$)', 'Spending Score (1-100)']]
-    
+
+    # Standardization
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    pickle.dump(scaler, open('models/scaler.pkl', 'wb'))
+    # Save scaler
+    joblib.dump(scaler, "models/scaler.pkl")
 
-    return X_scaled
+    return X_scaled, df

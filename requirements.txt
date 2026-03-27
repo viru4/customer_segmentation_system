@@ -1,6 +1,10 @@
-streamlit
 pandas
 numpy
 scikit-learn
 matplotlib
+seaborn
+streamlit
 joblib
+torch
+torchvision
+torchaudio

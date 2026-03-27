@@ -1,29 +1,27 @@
-import pickle
-import numpy as np
-from pathlib import Path
+import joblib
+import torch
+from src.autoencoder import Autoencoder
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-
-# Load models
-with open(ROOT_DIR / "models" / "scaler.pkl", "rb") as f:
-    scaler = pickle.load(f)
-with open(ROOT_DIR / "models" / "pca.pkl", "rb") as f:
-    pca = pickle.load(f)
-with open(ROOT_DIR / "models" / "kmeans_model.pkl", "rb") as f:
-    kmeans = pickle.load(f)
-
-def predict_cluster(input_data):
+def apply_pca(X):
     """
-    input_data: [[income, spending_score]]
+    Apply PCA dimensionality reduction
     """
-    
-    # Step 1: Scale
-    scaled = scaler.transform(input_data)
-    
-    # Step 2: PCA
-    reduced = pca.transform(scaled)
-    
-    # Step 3: Predict cluster
-    cluster = kmeans.predict(reduced)
-    
-    return cluster[0]
+    pca = joblib.load("models/pca.pkl")
+    return pca.transform(X)
+
+
+def apply_autoencoder(X):
+    """
+    Apply Autoencoder dimensionality reduction
+    """
+
+    model = Autoencoder(input_dim=X.shape[1])
+    model.load_state_dict(torch.load("models/autoencoder.pth"))
+    model.eval()
+
+    X_tensor = torch.tensor(X, dtype=torch.float32)
+
+    with torch.no_grad():
+        encoded = model.encoder(X_tensor)
+
+    return encoded.numpy()

@@ -1,92 +1,107 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import joblib
 import matplotlib.pyplot as plt
+
 import sys
-from pathlib import Path
+import os
+# Add project root to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+from src.data_preprocessing import load_and_preprocess
+from src.clustering import load_models
+from src.pipeline import apply_pca, apply_autoencoder
+from src.evaluation import evaluate_clustering
 
-from src.pipeline import predict_cluster
+# ---------------- UI ----------------
+st.title("🧠 Customer Segmentation System")
 
 # Load data
-df = pd.read_csv(ROOT_DIR / "data" / "Mall_Customers.csv")
+X_scaled, df = load_and_preprocess()
 
-# Load models from models folder (FIXED ✅)
-scaler = joblib.load(ROOT_DIR / "models" / "scaler.pkl")
-pca = joblib.load(ROOT_DIR / "models" / "pca.pkl")
-model = joblib.load(ROOT_DIR / "models" / "kmeans_model.pkl")
+# Sidebar
+st.sidebar.header("⚙️ Settings")
 
-st.title("🧠 Customer Segmentation Dashboard")
-st.write("K-Means + PCA Clustering Project")
-
-# Show dataset
-if st.checkbox("Show Dataset"):
-    st.write(df.head())
-
-# Feature selection
-X = df[['Annual Income (k$)', 'Spending Score (1-100)']]
-
-# Step 1: Scaling
-X_scaled = scaler.transform(X)
-
-# Step 2: PCA transformation (IMPORTANT 🔥)
-X_pca = pca.transform(X_scaled)
-
-# Step 3: Clustering
-clusters = model.predict(X_pca)
-
-# Visualization (NOW CORRECT ✅)
-fig, ax = plt.subplots()
-
-scatter = ax.scatter(
-    X_pca[:, 0],
-    X_pca[:, 1],
-    c=clusters
+dim_method = st.sidebar.selectbox(
+    "Dimensionality Reduction",
+    ["None", "PCA", "Autoencoder"]
 )
 
-centroids = model.cluster_centers_
-
-ax.scatter(
-    centroids[:, 0],
-    centroids[:, 1],
-    s=200,
-    marker='X'
+model_name = st.sidebar.selectbox(
+    "Clustering Algorithm",
+    ["KMeans", "DBSCAN", "GMM", "Hierarchical"]
 )
 
-ax.set_title("Customer Segments (PCA Reduced)")
-ax.set_xlabel("Principal Component 1")
-ax.set_ylabel("Principal Component 2")
+# Load models
+models = load_models()
+model = models[model_name]
 
-st.pyplot(fig)
+# Apply dimensionality reduction
+if dim_method == "PCA":
+    X_processed = apply_pca(X_scaled)
 
-# Cluster insights
-st.subheader("📌 Cluster Insights")
-cluster_counts = pd.Series(clusters).value_counts()
-st.write(cluster_counts)
+elif dim_method == "Autoencoder":
+    X_processed = apply_autoencoder(X_scaled)
 
-# Prediction section
-st.subheader("🔮 Predict Customer Segment")
+else:
+    X_processed = X_scaled
 
-income = st.slider("Annual Income", 0, 150, 50)
-score = st.slider("Spending Score", 0, 100, 50)
+# Predict clusters
+labels = model.fit_predict(X_processed)
 
-if st.button("Predict Cluster"):
-    
-    # ✅ USE PIPELINE (VERY IMPORTANT)
-    prediction = predict_cluster([[income, score]])
-    
-    def get_cluster_label(cluster):
-        labels = {
-            0: "Low Income - Low Spending",
-            1: "High Income - High Spending",
-            2: "Average Customers",
-            3: "High Income - Low Spending",
-            4: "Low Income - High Spending"
-        }
-        return labels.get(cluster, "Unknown")
+# ---------------- Visualization ----------------
+st.subheader("📊 Cluster Visualization")
 
-    st.success(f"Cluster: {prediction} → {get_cluster_label(prediction)}")
+plt.figure()
+plt.scatter(X_processed[:, 0], X_processed[:, 1], c=labels)
+plt.xlabel("Feature 1")
+plt.ylabel("Feature 2")
+
+st.pyplot(plt)
+
+# ---------------- Evaluation ----------------
+metrics = evaluate_clustering(X_processed, labels)
+
+st.subheader("📈 Model Evaluation")
+
+st.metric("Silhouette Score", round(metrics["Silhouette Score"], 3))
+st.metric("Davies-Bouldin Index", round(metrics["Davies-Bouldin Index"], 3))
+st.metric("Calinski-Harabasz Score", round(metrics["Calinski-Harabasz Score"], 3))
+
+# ---------------- Business Insights ----------------
+df["Cluster"] = labels
+
+st.subheader("🧠 Customer Insights")
+
+for cluster in sorted(df["Cluster"].unique()):
+    segment = df[df["Cluster"] == cluster]
+
+    st.write(f"### Cluster {cluster}")
+    st.write(f"Avg Income: {segment['Annual Income (k$)'].mean():.2f}")
+    st.write(f"Avg Spending Score: {segment['Spending Score (1-100)'].mean():.2f}")
+
+# ---------------- Model Comparison ----------------
+if st.button("Compare All Models"):
+
+    comparison = []
+
+    for name, m in models.items():
+        labels = m.fit_predict(X_processed)
+        scores = evaluate_clustering(X_processed, labels)
+        scores["Model"] = name
+        comparison.append(scores)
+
+    df_comp = pd.DataFrame(comparison)
+
+    st.subheader("📊 Model Comparison")
+    st.dataframe(df_comp)
+
+    # Best model
+    best = df_comp.sort_values("Silhouette Score", ascending=False).iloc[0]
+    st.success(f"🏆 Best Model: {best['Model']}")
+
+# ---------------- Download ----------------
+st.download_button(
+    "⬇️ Download Clustered Data",
+    df.to_csv(index=False),
+    file_name="clustered_customers.csv"
+)
