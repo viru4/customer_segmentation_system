@@ -105,3 +105,25 @@ st.download_button(
     df.to_csv(index=False),
     file_name="clustered_customers.csv"
 )
+
+st.markdown("---")
+
+st.markdown(
+    """
+    <div style="text-align:center;">
+        <h4>👨‍💻 Developed by Virendra Kumar</h4>
+        <p>
+            <a href="https://github.com/viru4">GitHub</a> |
+            <a href="https://virendramlportfolio.netlify.app">Portfolio</a> |
+            <a href="https://www.linkedin.com/in/virendra-kumar04/">LinkedIn</a>
+        </p>
+        <p>🚀 Machine Learning + Deep Learning Project</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.sidebar.markdown("## 👨‍💻 Developer")
+st.sidebar.markdown("Virendra Kumar")
+st.sidebar.markdown("[GitHub](https://github.com/viru4)")
+st.sidebar.markdown("[Portfolio](https://virendramlportfolio.netlify.app/)")
